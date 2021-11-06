@@ -1,28 +1,28 @@
 
 # read the condition (tumor) TCGA-THCA dataset [TSS - 01] 
-rna_expr_data_C <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_expr_data_C.txt", header=TRUE, sep="", check.names = F) 
+rna_expr_data_C <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_expr_data_C.txt", header=TRUE, sep="", check.names = F) 
 # View(rna_expr_data_C)
 
-rna_gene_data_C <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_genes_C.txt", header=FALSE, sep="", check.names = F) 
+rna_gene_data_C <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_genes_C.txt", header=FALSE, sep="", check.names = F) 
 # View(rna_gene_data_C)
 
-rna_patients_data_C <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_patients_C.txt", header=FALSE, sep="", check.names = F) 
+rna_patients_data_C <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_patients_C.txt", header=FALSE, sep="", check.names = F) 
 # View(rna_patients_data_C)
 
 # read the normal (natural) TCGA-THCA dataset [TSS - 11]
-rna_expr_data_N <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_expr_data_N.txt", header=TRUE, sep="", check.names = F) 
-# View(rna_expr_data_C)
+rna_expr_data_N <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_expr_data_N.txt", header=TRUE, sep="", check.names = F) 
+# View(rna_expr_data_N)
 
-rna_gene_data_N <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_genes_N.txt", header=FALSE, sep="", check.names = F) 
-# View(rna_gene_data_C)
+rna_gene_data_N <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_genes_N.txt", header=FALSE, sep="", check.names = F) 
+# View(rna_gene_data_N)
 
-rna_patients_data_N <- read.table("./Data Extracted/TCGA-THCA/TCGA-THCA_rna_patients_N.txt", header=FALSE, sep="", check.names = F) 
-# View(rna_patients_data_C)
+rna_patients_data_N <- read.table("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_rna_patients_N.txt", header=FALSE, sep="", check.names = F) 
+# View(rna_patients_data_N)
 
 # to be use (?) - for extra information, i think.. now its useless
-clinical_data <- read.csv2("./Data Extracted/TCGA-THCA/TCGA-THCA_clinical_data.txt", header = FALSE, sep=",")
+clinical_data <- read.csv2("./Data Extracted - Counts/TCGA-THCA/TCGA-THCA_clinical_data.txt", header = FALSE, sep=",")
 colnames(clinical_data) <- clinical_data[1,]; clinical_data <- clinical_data[-1,] 
-# View(cl)
+# View(clinical_data)
 
 
 # 1. Data - Intersection through the partecipants -------------------------

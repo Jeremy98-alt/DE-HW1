@@ -5,7 +5,7 @@ proj <- "TCGA-THCA"
 
 dir.create(file.path(proj))
 
-rna.query.C <- GDCquery(project = proj, data.category = "Transcriptome Profiling", data.type = "Gene Expression Quantification", workflow.type = "HTSeq - FPKM", sample.type = "Primary Tumor") # sample = 01 - TP
+rna.query.C <- GDCquery(project = proj, data.category = "Transcriptome Profiling", data.type = "Gene Expression Quantification", workflow.type = "HTSeq - Counts", sample.type = "Primary Tumor") # sample = 01 - TP
 GDCdownload(query = rna.query.C, directory = "GDCdata", method = "api")
 rna.data.C <- GDCprepare(rna.query.C)
 rna.expr.data.C <- assay(rna.data.C)
@@ -15,7 +15,7 @@ write.table(rna.expr.data.C, file=file.path(proj,paste(proj, "_rna_expr_data_C.t
 write.table(rna.sample.info.C@listData$patient, file=file.path(proj,paste(proj, "_rna_patients_C.txt",sep = "")), row.names=FALSE, col.names=FALSE, quote = FALSE)
 write.table(rna.genes.info.C@ranges@NAMES, file=file.path(proj,paste(proj, "_rna_genes_C.txt",sep = "")), row.names=FALSE, col.names=FALSE, quote = FALSE)
 
-rna.query.N <- GDCquery(project = proj, data.category = "Transcriptome Profiling", data.type = "Gene Expression Quantification", workflow.type = "HTSeq - FPKM", sample.type = "Solid Tissue Normal") # sample = 11 - NT
+rna.query.N <- GDCquery(project = proj, data.category = "Transcriptome Profiling", data.type = "Gene Expression Quantification", workflow.type = "HTSeq - Counts", sample.type = "Solid Tissue Normal") # sample = 11 - NT
 GDCdownload(query = rna.query.N, directory = "GDCdata", method = "api")
 rna.data.N <- GDCprepare(rna.query.N)
 rna.expr.data.N <- assay(rna.data.N)
