@@ -1,3 +1,8 @@
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
+# 
+# BiocManager::install("TCGAbiolinks")
+
 library(TCGAbiolinks)
 library(SummarizedExperiment)
 
@@ -25,6 +30,7 @@ write.table(rna.expr.data.N, file=file.path(proj,paste(proj, "_rna_expr_data_N.t
 write.table(rna.sample.info.N@listData$patient, file=file.path(proj,paste(proj, "_rna_patients_N.txt",sep = "")), row.names=FALSE, col.names=FALSE, quote = FALSE)
 write.table(rna.genes.info.N@ranges@NAMES, file=file.path(proj,paste(proj, "_rna_genes_N.txt",sep = "")), row.names=FALSE, col.names=FALSE, quote = FALSE)
 
-clinical.query<-GDCquery_clinic(project = proj, type = "clinical", save.csv = FALSE)
-write.csv(clinical.query, file = file.path(proj,paste(proj, "_clinical_data.txt",sep="")), row.names = FALSE, quote = FALSE)
+# Extra Information from the patients treated in our next analysis
+# clinical.query<-GDCquery_clinic(project = proj, type = "clinical", save.csv = FALSE)
+# write.csv(clinical.query, file = file.path(proj,paste(proj, "_clinical_data.txt",sep="")), row.names = FALSE, quote = FALSE)
 
