@@ -166,8 +166,13 @@ genes_passed <- rownames(final_dt)
 rna_expr_data_C <- rna_expr_data_C[genes_passed, ]
 rna_expr_data_N <- rna_expr_data_N[genes_passed, ]
 
+# log-transform FPKM data using log2(x+1) of each count
+rna_expr_data_C <- log2(rna_expr_data_C+1)
+rna_expr_data_N <- log2(rna_expr_data_N+1)
+
 # Extra Part - Find the good threshold / Emulate Fiscon lecture ------------------------------------
 
+library(igraph)
 createNet <- function(dt, dt2, x){
   # create the correlation datasets for plotting the network for each graph
   co_net_corr_dataC <- cor(t(dt), method = "pearson")
@@ -191,9 +196,8 @@ densities <- unlist(lapply(possibletsh, function(x){
 
 plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Pearson Correlation", ylab = "Fraction of nodes (Density)", main = "Optimal Threshold Between the two graphs")
 abline(h = 0.8, lty=2) # abline(h = densities, lty=2)
-abline(v = 0.365, lty=2) # abline(v = possibletsh, lty = 3)
-lines(0.365, 0.8, col="blue")
-points(x = 0.365, y = 0.8, pch = 20, col = "red", cex = 1.5) # this is our preferable thresholding
+abline(v = 0.495, lty=2) # abline(v = possibletsh, lty = 3)
+points(x = 0.495, y = 0.8, pch = 20, col = "red", cex = 1.5) # this is our preferable thresholding
 
 # Ended the Extra Part ----------------------------------------------------
 
@@ -202,19 +206,17 @@ co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
 co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 
 # binary masks
-tsh <- 0.365
-co_net_corr_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
-co_net_corr_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
+tsh <- 0.495
+co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
+co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
 
 # create the graph
-library(igraph)
-
-gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
-plot(gC, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
+gC <- graph_from_adjacency_matrix(co_net_corrBinary_dataC, diag = FALSE)
+plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
 
-gN <- graph_from_adjacency_matrix( co_net_corr_dataN, diag = FALSE)
-plot(gN, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
+gN <- graph_from_adjacency_matrix( co_net_corrBinary_dataN, diag = FALSE)
+plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
 
 # degree distribution of the graphs
@@ -238,6 +240,8 @@ intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
 
 
 
+
 # 5. OPTIONAL TASKS -------------------------------------------------------
 
-
+# the points provided by the professor
+# adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
