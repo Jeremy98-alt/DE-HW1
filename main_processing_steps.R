@@ -113,9 +113,8 @@ DESQ_dt <- DESQ_dt[keep,]
 # main 
 DESQ_dtOutput <- DESeq(DESQ_dt)
 
-
 # get the results, obtaining the correction FDR through different tests, its important to note the adjpvalue!
-res <- results(DESQ_dtOutput, alpha = 0.05, lfcThreshold = 1.2)# this applies a threshold of alpha = 0.5, to make correction of different tests applied, we apply some corrections optimizing the number of genes which will have an adjusted p value below a given FDR cutoff, alpha = 0.05 and not 0.1
+res <- results(DESQ_dtOutput, alpha = 0.05, lfcThreshold = 1.2) # this applies a threshold of alpha = 0.5, to make correction of different tests applied, we apply some corrections optimizing the number of genes which will have an adjusted p value below a given FDR cutoff, alpha = 0.05 and not 0.1
 res
 
 # better to show the final summary of all
@@ -138,8 +137,8 @@ resultsNames(DESQ_dtOutput)
 plotMA(res, ylim = c(-8, 8))
 
 
+# Result Volcano plot ------------------------------------------------------------
 
-# Volcano plot
 topT <- as.data.frame(res)
 
 #Adjusted P values (FDR Q values)
@@ -147,7 +146,6 @@ with(topT, plot(log2FoldChange, -log10(padj), pch=20, main="Volcano plot", cex=1
 with(subset(topT, padj<=0.05 & log2FoldChange>=1.2), points(log2FoldChange, -log10(padj), pch=20, col="red", cex=0.5))
 
 with(subset(topT, padj<=0.05 & log2FoldChange<= -1.2), points(log2FoldChange, -log10(padj), pch=20, col="green", cex=0.5))
-
 
 #Add lines for absolute FC>2 and P-value cut-off at FDR Q<0.05
 abline(v=0, col="black", lty=3, lwd=1.0)
@@ -157,6 +155,52 @@ abline(h=-log10(max(topT$pvalue[topT$padj<=0.05], na.rm=TRUE)), col="black", lty
 
 # 3. Co-expression networks -----------------------------------------------
 
+# extract the filtered DEGs
+res_save <- subset(resOrdered, padj <= 0.05)
+final_dt <- as.data.frame(res_save)
+
+# extract the genes 
+genes_passed <- rownames(final_dt)
+
+# filter the two datasets expressed in tumor and normal 
+rna_expr_data_C <- rna_expr_data_C[genes_passed, ]
+rna_expr_data_N <- rna_expr_data_N[genes_passed, ]
+
+# create the correlation datasets for plotting the network for each graph
+co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
+co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
+
+# binary masks
+tsh <- 0.40
+co_net_corr_dataC <- ifelse(co_net_corr_dataC <= tsh & co_net_corr_dataC >= -tsh, 0, 1)
+co_net_corr_dataN <- ifelse(co_net_corr_dataN <= tsh & co_net_corr_dataN >= -tsh, 0, 1)
+
+# create the graph
+# library(igraph)
+
+gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
+plot(gC, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+
+gN <- graph_from_adjacency_matrix( co_net_corr_dataN, diag = FALSE)
+plot(gN, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+
+# degree distribution of the graphs
+hist(degree.distribution(gC), main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
+hist(degree.distribution(gN), main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
+
+# extract the 5% of HUBS, in their conditions
+hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
+hubs_C <- hubs_C[1:floor(0.05 * length(hubs_C))] 
+hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
+hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
+
+# find the common hubs
+namesHUBS_C <- names(hubs_C)
+namesHUBS_N <- names(hubs_N)
+
+intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
 
 # 4. Differential Co-expressed Network ------------------------------------
 
