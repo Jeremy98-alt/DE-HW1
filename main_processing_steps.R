@@ -166,17 +166,48 @@ genes_passed <- rownames(final_dt)
 rna_expr_data_C <- rna_expr_data_C[genes_passed, ]
 rna_expr_data_N <- rna_expr_data_N[genes_passed, ]
 
+# Extra Part - Find the good threshold / Emulate Fiscon lecture ------------------------------------
+
+createNet <- function(dt, dt2, x){
+  # create the correlation datasets for plotting the network for each graph
+  co_net_corr_dataC <- cor(t(dt), method = "pearson")
+  co_net_corr_dataN <- cor(t(dt2), method = "pearson")
+
+  tsh <- x
+  co_net_corr_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
+  co_net_corr_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
+
+  gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
+  gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
+  
+  avg_dens <- (edge_density(gN, loop = FALSE) + edge_density(gC, loop = FALSE))/2
+  return(avg_dens)
+}
+
+possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
+densities <- unlist(lapply(possibletsh, function(x){
+  return(createNet(rna_expr_data_C, rna_expr_data_N, x))
+}))
+
+plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Pearson Correlation", ylab = "Fraction of nodes (Density)", main = "Optimal Threshold Between the two graphs")
+abline(h = 0.8, lty=2) # abline(h = densities, lty=2)
+abline(v = 0.365, lty=2) # abline(v = possibletsh, lty = 3)
+lines(0.365, 0.8, col="blue")
+points(x = 0.365, y = 0.8, pch = 20, col = "red", cex = 1.5) # this is our preferable thresholding
+
+# Ended the Extra Part ----------------------------------------------------
+
 # create the correlation datasets for plotting the network for each graph
 co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
 co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 
 # binary masks
-tsh <- 0.40
-co_net_corr_dataC <- ifelse(co_net_corr_dataC <= tsh & co_net_corr_dataC >= -tsh, 0, 1)
-co_net_corr_dataN <- ifelse(co_net_corr_dataN <= tsh & co_net_corr_dataN >= -tsh, 0, 1)
+tsh <- 0.365
+co_net_corr_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
+co_net_corr_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
 
 # create the graph
-# library(igraph)
+library(igraph)
 
 gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
 plot(gC, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
@@ -187,6 +218,7 @@ plot(gN, vertex.size=7, edge.curverd=.1, arrow.size=.1, vertex.color = "green", 
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
 
 # degree distribution of the graphs
+par(mfrow=c(1,2))
 hist(degree.distribution(gC), main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
 hist(degree.distribution(gN), main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
 
@@ -203,6 +235,7 @@ namesHUBS_N <- names(hubs_N)
 intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
 
 # 4. Differential Co-expressed Network ------------------------------------
+
 
 
 # 5. OPTIONAL TASKS -------------------------------------------------------
