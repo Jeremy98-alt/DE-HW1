@@ -113,8 +113,9 @@ DESQ_dt <- DESQ_dt[keep,]
 # main 
 DESQ_dtOutput <- DESeq(DESQ_dt)
 
+
 # get the results, obtaining the correction FDR through different tests, its important to note the adjpvalue!
-res <- results(DESQ_dtOutput, alpha = 0.05) # this applies a threshold of alpha = 0.5, to make correction of different tests applied, we apply some corrections optimizing the number of genes which will have an adjusted p value below a given FDR cutoff, alpha = 0.05 and not 0.1
+res <- results(DESQ_dtOutput, alpha = 0.05, lfcThreshold = 1.2)# this applies a threshold of alpha = 0.5, to make correction of different tests applied, we apply some corrections optimizing the number of genes which will have an adjusted p value below a given FDR cutoff, alpha = 0.05 and not 0.1
 res
 
 # better to show the final summary of all
@@ -136,6 +137,23 @@ resultsNames(DESQ_dtOutput)
 # the function plotMA shows the log2 fold changes attributable to a given variable over the mean of normalized counts for all the samples in the DESeqDataSet. Points will be colored red if the adjusted p value is less than 0.1. Points which fall out of the window are plotted as open triangles pointing either up or down. 
 plotMA(res, ylim = c(-8, 8))
 
+
+
+# Volcano plot
+topT <- as.data.frame(res)
+
+#Adjusted P values (FDR Q values)
+with(topT, plot(log2FoldChange, -log10(padj), pch=20, main="Volcano plot", cex=1.0, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~p~value)))
+with(subset(topT, padj<=0.05 & log2FoldChange>=1.2), points(log2FoldChange, -log10(padj), pch=20, col="red", cex=0.5))
+
+with(subset(topT, padj<=0.05 & log2FoldChange<= -1.2), points(log2FoldChange, -log10(padj), pch=20, col="green", cex=0.5))
+
+
+#Add lines for absolute FC>2 and P-value cut-off at FDR Q<0.05
+abline(v=0, col="black", lty=3, lwd=1.0)
+abline(v=-1.2, col="black", lty=4, lwd=2.0)
+abline(v=1.2, col="black", lty=4, lwd=2.0)
+abline(h=-log10(max(topT$pvalue[topT$padj<=0.05], na.rm=TRUE)), col="black", lty=4, lwd=2.0)
 
 # 3. Co-expression networks -----------------------------------------------
 
