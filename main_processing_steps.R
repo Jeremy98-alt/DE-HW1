@@ -172,48 +172,54 @@ rna_expr_data_N <- log2(rna_expr_data_N+1)
 
 # Extra Part - Find the good threshold / Emulate Fiscon lecture ------------------------------------
 
-library(igraph)
-createNet <- function(dt, dt2, x){
-  # create the correlation datasets for plotting the network for each graph
-  co_net_corr_dataC <- cor(t(dt), method = "pearson")
-  co_net_corr_dataN <- cor(t(dt2), method = "pearson")
-
-  tsh <- x
-  co_net_corr_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
-  co_net_corr_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
-
-  gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
-  gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
-  
-  avg_dens <- (edge_density(gN, loop = FALSE) + edge_density(gC, loop = FALSE))/2
-  return(avg_dens)
-}
-
-possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
-densities <- unlist(lapply(possibletsh, function(x){
-  return(createNet(rna_expr_data_C, rna_expr_data_N, x))
-}))
-
-plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Pearson Correlation", ylab = "Fraction of nodes (Density)", main = "Optimal Threshold Between the two graphs")
-abline(h = 0.8, lty=2) # abline(h = densities, lty=2)
-abline(v = 0.495, lty=2) # abline(v = possibletsh, lty = 3)
-points(x = 0.495, y = 0.8, pch = 20, col = "red", cex = 1.5) # this is our preferable thresholding
+# library(igraph)
+# createNet <- function(dt, dt2, x){
+#   # create the correlation datasets for plotting the network for each graph
+#   co_net_corr_dataC <- cor(t(dt), method = "pearson")
+#   co_net_corr_dataN <- cor(t(dt2), method = "pearson")
+# 
+#   tsh <- x
+#   co_net_corr_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
+#   co_net_corr_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
+# 
+#   gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
+#   gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
+#   
+#   avg_dens <- (edge_density(gN, loop = FALSE) + edge_density(gC, loop = FALSE))/2
+#   return(avg_dens)
+# }
+# 
+# possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
+# densities <- unlist(lapply(possibletsh, function(x){
+#   return(createNet(rna_expr_data_C, rna_expr_data_N, x))
+# }))
+# 
+# plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Pearson Correlation", ylab = "Fraction of nodes (Density)", main = "Naive-Hard Threshold")
+# rect(xleft = 0.4, ybottom = 0.0, xright = 0.6, ytop = 0.4, density = 5, border = "red", lty = 2, lwd = 1)
+# 
+# # we consider a naive threshold to consider a well connected network like a scale-free with few hubs, its however a hard thresholding in this case
+# abline(h = 0.2, lty=2)
+# abline(v = 0.5, lty=2)
+# points(x = 0.5, y = 0.2, pch = 20, col = "red", cex = 1.5) # this is our preferable naive-hard thresholding
 
 # Ended the Extra Part ----------------------------------------------------
+
+library(igraph)
 
 # create the correlation datasets for plotting the network for each graph
 co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
 co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 
 # binary masks
-tsh <- 0.495
-co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= abs(tsh) & co_net_corr_dataC >= -abs(tsh), 1, 0)
-co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= abs(tsh) & co_net_corr_dataN >= -abs(tsh), 1, 0)
+tsh <- 0.7
+co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
+co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
 
 # create the graph
 gC <- graph_from_adjacency_matrix(co_net_corrBinary_dataC, diag = FALSE)
 plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+
 
 gN <- graph_from_adjacency_matrix( co_net_corrBinary_dataN, diag = FALSE)
 plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
@@ -221,8 +227,10 @@ plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", 
 
 # degree distribution of the graphs
 par(mfrow=c(1,2))
-hist(degree.distribution(gC), main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
-hist(degree.distribution(gN), main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
+dgC <- degree(gC)
+dgN <- degree(gN)
+hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
+hist(dgC[dgC != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
 
 # extract the 5% of HUBS, in their conditions
 hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
