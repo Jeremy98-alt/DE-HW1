@@ -287,7 +287,7 @@ for(hub_comm in hubs_commonZCN){
   # save the genes connected for each hub in common
   subnodesHub <- names(na.omit(ZcoData[hub_comm, ZcoData[hub_comm, ] == 1]))
   
-  subgraph_one_hub <- induced.subgraph(graph = gZcoData, vids = subnodesHub)
+  subgraph_one_hub <- induced.subgraph(graph = gZcoData, vids = c(subnodesHub, hub_comm))
   
   V(subgraph_one_hub)$color <- ifelse(V(subgraph_one_hub)$name == hub_comm, "red", "green")
   plot(subgraph_one_hub, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = V(subgraph_one_hub)$color, main = paste("Subgraph of Hub", hub_comm, "in Differential Co-expression", sep = " "),
