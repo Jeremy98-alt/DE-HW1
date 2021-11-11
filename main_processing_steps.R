@@ -246,7 +246,53 @@ intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
 
 # 4. Differential Co-expressed Network ------------------------------------
 
+# create the correlation datasets for plotting the network for each graph
+co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
+co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 
+# Application Z-Fisher Transform
+ZcoDataC <- log((1+co_net_corr_dataC)/(1-co_net_corr_dataC))/2
+ZcoDataN <- log((1+co_net_corr_dataN)/(1-co_net_corr_dataN))/2
+
+# Applying z-scores
+ZcoData <- (ZcoDataC-ZcoDataN)/sqrt((1/(nrow(rna_expr_data_C)-3)) + (1/(nrow(rna_expr_data_N)-3)))
+
+# Threshold it
+tshZ <- 13 # 13 is the best for getting a scale-free, 3 is too bad
+ZcoData <- ifelse(ZcoData <= -abs(tshZ) | ZcoData >= abs(tshZ), 1, 0)
+
+# Get the graph and plot it
+gZcoData <- graph_from_adjacency_matrix( ZcoData, diag = FALSE)
+plot(gZcoData, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Differential Co-expression network in TUMOR vs NORMAL",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA)
+
+# dgZcoData degree distribution
+dgZcoData <- degree(gZcoData)
+hist(dgZcoData[dgZcoData != 0], main = "Degree distribution in TUMOR vs NORMAL condition", col = "red", xlab = "Degree Distribution", breaks = 50)
+
+# extract the 5% of HUBS, in their conditions
+hubs_Z <- sort(degree(gZcoData, v = V(gZcoData), mode = "all"), decreasing = TRUE) # normalized TRUE
+hubs_Z <- hubs_Z[1:floor(0.05 * length(hubs_Z))] 
+
+# Comparing hubs in TUMORS and Z-Tum vs. Z-Norm
+namesHUBS_Z <- names(hubs_Z)
+namesHUBS_C <- names(hubs_C)
+namesHUBS_N <- names(hubs_N)
+
+hubs_commonZCN <- intersect(intersect(namesHUBS_C, namesHUBS_N), namesHUBS_Z) # Common HUBS!
+print(hubs_commonZCN)
+
+# generalize
+for(hub_comm in hubs_commonZCN){
+  # save the genes connected for each hub in common
+  subnodesHub <- names(na.omit(ZcoData[hub_comm, ZcoData[hub_comm, ] == 1]))
+  
+  subgraph_one_hub <- induced.subgraph(graph = gZcoData, vids = subnodesHub)
+  
+  V(subgraph_one_hub)$color <- ifelse(V(subgraph_one_hub)$name == hub_comm, "red", "green")
+  plot(subgraph_one_hub, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = V(subgraph_one_hub)$color, main = paste("Subgraph of Hub", hub_comm, "in Differential Co-expression", sep = " "),
+       arrow.width=.1, edge.arrow.size=.1, layout= layout_on_sphere, vertex.label = NA)
+}
 
 
 # 5. OPTIONAL TASKS -------------------------------------------------------
