@@ -142,9 +142,8 @@ plotMA(res, ylim = c(-8, 8))
 topT <- as.data.frame(res)
 
 #Adjusted P values (FDR Q values)
-with(topT, plot(log2FoldChange, -log10(padj), pch=20, main="Volcano plot", cex=1.0, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~p~value)))
+with(topT, plot(log2FoldChange, -log10(padj), pch=20, main="Volcano plot", cex=1.0, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~adj.pvalue)))
 with(subset(topT, padj<=0.05 & log2FoldChange>=1.2), points(log2FoldChange, -log10(padj), pch=20, col="red", cex=0.5))
-
 with(subset(topT, padj<=0.05 & log2FoldChange<= -1.2), points(log2FoldChange, -log10(padj), pch=20, col="green", cex=0.5))
 
 #Add lines for absolute FC>2 and P-value cut-off at FDR Q<0.05
@@ -172,35 +171,49 @@ rna_expr_data_N <- log2(rna_expr_data_N+1)
 
 # Extra Part - Find the good threshold / Emulate Fiscon lecture ------------------------------------
 
-# library(igraph)
-# createNet <- function(dt, dt2, x){
-#   # create the correlation datasets for plotting the network for each graph
-#   co_net_corr_dataC <- cor(t(dt), method = "pearson")
-#   co_net_corr_dataN <- cor(t(dt2), method = "pearson")
-# 
-#   tsh <- x
-#   co_net_corr_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
-#   co_net_corr_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
-# 
-#   gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
-#   gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
-#   
-#   avg_dens <- (edge_density(gN, loop = FALSE) + edge_density(gC, loop = FALSE))/2
-#   return(avg_dens)
-# }
-# 
-# possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
-# densities <- unlist(lapply(possibletsh, function(x){
-#   return(createNet(rna_expr_data_C, rna_expr_data_N, x))
-# }))
-# 
-# plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Pearson Correlation", ylab = "Fraction of nodes (Density)", main = "Naive-Hard Threshold")
-# rect(xleft = 0.4, ybottom = 0.0, xright = 0.6, ytop = 0.4, density = 5, border = "red", lty = 2, lwd = 1)
-# 
-# # we consider a naive threshold to consider a well connected network like a scale-free with few hubs, its however a hard thresholding in this case
-# abline(h = 0.2, lty=2)
-# abline(v = 0.5, lty=2)
-# points(x = 0.5, y = 0.2, pch = 20, col = "red", cex = 1.5) # this is our preferable naive-hard thresholding
+library(igraph)
+
+fractionNodes <- function(graph){
+  v_graph <- length(V(graph))
+  component <- components(graph)
+  ind <- which(component$membership == which.max(component$csize))
+  LCC <- induced_subgraph(graph , V(graph)[ind])
+  v_LCC <- length(V(LCC))
+  
+  frac_node_LCC <- v_LCC / v_graph
+  return(frac_node_LCC)
+}
+
+OptimalThresholding <- function(dt, dt2, x){
+  # create the correlation datasets for plotting the network for each graph
+  co_net_corr_dataC <- cor(t(dt), method = "pearson")
+  co_net_corr_dataN <- cor(t(dt2), method = "pearson")
+
+  tsh <- x
+  co_net_corr_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
+  co_net_corr_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
+
+  gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
+  gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
+
+  fracNodes_C <- fractionNodes(gC)
+  fracNodes_N <- fractionNodes(gN)
+  
+  return(mean(fracNodes_C, fracNodes_N))
+}
+
+possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
+densities <- unlist(lapply(possibletsh, function(x){
+  return(OptimalThresholding(rna_expr_data_C, rna_expr_data_N, x))
+}))
+
+plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Measure of Correlation", ylab = "Fraction of nodes", main = "Naive-Hard Threshold")
+rect(xleft = 0.4, ybottom = 0.0, xright = 0.65, ytop = 1.0, density = 5, border = "red", lty = 2, lwd = 1)
+
+# we consider a naive threshold to consider a well connected network like a scale-free with few hubs, its however a hard thresholding in this case
+abline(h = 0.97, lty=2)
+abline(v = 0.55, lty=2)
+points(x = 0.55, y = 0.97, pch = 20, col = "red", cex = 1.5) # this is our preferable naive-hard thresholding
 
 # Ended the Extra Part ----------------------------------------------------
 
@@ -210,12 +223,35 @@ library(igraph)
 co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
 co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 
+# plot the distribution of the correlations to pick naive the good 
+distroRho_pearsC <- co_net_corr_dataC[upper.tri(co_net_corr_dataC)]
+distroRho_pearsN <- co_net_corr_dataN[upper.tri(co_net_corr_dataN)]
+
+par(mfrow = c(1, 2))
+hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
+hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
+
+# these are probably the candidates of having a good threshold
+quantile(abs(distroRho_pearsC))
+quantile(abs(distroRho_pearsN))
+
+## Approximately is good to choose 0.55 instead 0.7!
+
 # binary masks
-tsh <- 0.7
+tsh <- 0.55 # 0.7
 co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
 co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
 
+par(mfrow = c(1, 2))
+hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "yellow", cex = 1.5) # this is our preferable naive-hard thresholding
+hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "yellow", cex = 1.5) # this is our preferable naive-hard thresholding
+
 # create the graph
+par(mfrow=c(1,1))
 gC <- graph_from_adjacency_matrix(co_net_corrBinary_dataC, diag = FALSE)
 plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
@@ -242,9 +278,13 @@ hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))]
 namesHUBS_C <- names(hubs_C)
 namesHUBS_N <- names(hubs_N)
 
+namesHUBS_C
+namesHUBS_N
 intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
 
 # 4. Differential Co-expressed Network ------------------------------------
+
+par(mfrow=c(1,1)) #eventually reset the plot visualization
 
 # create the correlation datasets for plotting the network for each graph
 co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
@@ -282,7 +322,7 @@ namesHUBS_N <- names(hubs_N)
 hubs_commonZCN <- intersect(intersect(namesHUBS_C, namesHUBS_N), namesHUBS_Z) # Common HUBS!
 print(hubs_commonZCN)
 
-# generalize
+# generalize, not always used
 for(hub_comm in hubs_commonZCN){
   # save the genes connected for each hub in common
   subnodesHub <- names(na.omit(ZcoData[hub_comm, ZcoData[hub_comm, ] == 1]))
@@ -297,5 +337,53 @@ for(hub_comm in hubs_commonZCN){
 
 # 5. OPTIONAL TASKS -------------------------------------------------------
 
-# the points provided by the professor
-# adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
+# solution of the optional points 
+
+# 1.
+
+# 2.
+
+# 3. Extra part in which we use two different correlation method
+method_correlation <- c("pearson", "spearman")
+for (i in  method_correlation) {
+  # create the correlation datasets for plotting the network for each graph
+  co_net_corr_dataC <- cor(t(rna_expr_data_C), method = i)
+  co_net_corr_dataN <- cor(t(rna_expr_data_N), method = i)
+  
+  # binary masks
+  tsh <- 0.6
+  co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
+  co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
+  
+  # create the graph
+  gC <- graph_from_adjacency_matrix(co_net_corrBinary_dataC, diag = FALSE)
+  plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = paste("Co-expression network in TUMOR with", i,  "Correlation", sep = " "),
+       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+  
+  
+  gN <- graph_from_adjacency_matrix( co_net_corrBinary_dataN, diag = FALSE)
+  plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = paste("Co-expression network in NORMAL with", i,  "Correlation", sep = " "),
+       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+  
+  # degree distribution of the graphs
+  dgC <- degree(gC)
+  dgN <- degree(gN)
+  hist(dgC[dgC != 0], main = paste("Degree distribution in TUMOR condition with", i, "Correlation", sep = " ") , col = "red", xlab = "Degree Distribution")
+  hist(dgC[dgC != 0], main = paste("Degree distribution in NORMAL condition  with", i, "Correlation", sep = " "), col = "green", xlab = "Degree Distribution")
+  
+  # extract the 5% of HUBS, in their conditions
+  hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
+  hubs_C <- hubs_C[1:floor(0.05 * length(hubs_C))] 
+  hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
+  hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
+  
+  # find the common hubs
+  namesHUBS_C <- names(hubs_C)
+  namesHUBS_N <- names(hubs_N)
+  
+  print(paste(i, intersect(namesHUBS_C, namesHUBS_N), sep = " ")) # Common HUBS!
+}
+
+
+# TO DO: further works (eventually)
+# 1. adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
