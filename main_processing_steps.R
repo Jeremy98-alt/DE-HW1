@@ -169,6 +169,23 @@ rna_expr_data_N <- rna_expr_data_N[genes_passed, ]
 rna_expr_data_C <- log2(rna_expr_data_C+1)
 rna_expr_data_N <- log2(rna_expr_data_N+1)
 
+# create the correlation datasets for plotting the network for each graph
+co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
+co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
+
+# plot the distribution of the correlations to pick naive the good 
+distroRho_pearsC <- co_net_corr_dataC[upper.tri(co_net_corr_dataC)]
+distroRho_pearsN <- co_net_corr_dataN[upper.tri(co_net_corr_dataN)]
+
+par(mfrow = c(1, 2))
+hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
+hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
+
+# these are probably the candidates of having a good threshold
+quantile(abs(distroRho_pearsC))
+quantile(abs(distroRho_pearsN))
+
+## Approximately is good to choose 0.55 instead 0.7!
 # Extra Part - Find the good threshold / Emulate Fiscon lecture ------------------------------------
 
 library(igraph)
@@ -188,14 +205,14 @@ OptimalThresholding <- function(dt, dt2, x){
   # create the correlation datasets for plotting the network for each graph
   co_net_corr_dataC <- cor(t(dt), method = "pearson")
   co_net_corr_dataN <- cor(t(dt2), method = "pearson")
-
+  
   tsh <- x
   co_net_corr_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
   co_net_corr_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
-
+  
   gC <- graph_from_adjacency_matrix(co_net_corr_dataC, diag = FALSE)
   gN <- graph_from_adjacency_matrix(co_net_corr_dataN, diag = FALSE)
-
+  
   fracNodes_C <- fractionNodes(gC)
   fracNodes_N <- fractionNodes(gN)
   
@@ -216,26 +233,6 @@ abline(v = 0.55, lty=2)
 points(x = 0.55, y = 0.97, pch = 20, col = "red", cex = 1.5) # this is our preferable naive-hard thresholding
 
 # Ended the Extra Part ----------------------------------------------------
-
-library(igraph)
-
-# create the correlation datasets for plotting the network for each graph
-co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
-co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
-
-# plot the distribution of the correlations to pick naive the good 
-distroRho_pearsC <- co_net_corr_dataC[upper.tri(co_net_corr_dataC)]
-distroRho_pearsN <- co_net_corr_dataN[upper.tri(co_net_corr_dataN)]
-
-par(mfrow = c(1, 2))
-hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
-hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
-
-# these are probably the candidates of having a good threshold
-quantile(abs(distroRho_pearsC))
-quantile(abs(distroRho_pearsN))
-
-## Approximately is good to choose 0.55 instead 0.7!
 
 # binary masks
 tsh <- 0.55 # 0.7
@@ -265,8 +262,8 @@ plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", 
 par(mfrow=c(1,2))
 dgC <- degree(gC)
 dgN <- degree(gN)
-hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
-hist(dgC[dgC != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
+hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution", breaks = 50)
+hist(dgN[dgN != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution", breaks = 50)
 
 # extract the 5% of HUBS, in their conditions
 hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
@@ -298,13 +295,13 @@ ZcoDataN <- log((1+co_net_corr_dataN)/(1-co_net_corr_dataN))/2
 ZcoData <- (ZcoDataC-ZcoDataN)/sqrt((1/(nrow(rna_expr_data_C)-3)) + (1/(nrow(rna_expr_data_N)-3)))
 
 # Threshold it
-tshZ <- 13 # 13 is the best for getting a scale-free, 3 is too bad
+tshZ <- 11 # 11 is better for us for getting a scale-free, 3 is too bad
 ZcoData <- ifelse(ZcoData <= -abs(tshZ) | ZcoData >= abs(tshZ), 1, 0)
 
 # Get the graph and plot it
 gZcoData <- graph_from_adjacency_matrix( ZcoData, diag = FALSE)
 plot(gZcoData, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Differential Co-expression network in TUMOR vs NORMAL",
-     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA)
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.auto, vertex.label = NA)
 
 # dgZcoData degree distribution
 dgZcoData <- degree(gZcoData)
@@ -341,64 +338,85 @@ for(hub_comm in hubs_commonZCN){
 
 # 1.
 
-softTshPower <- function(dt, beta){
-  pw <- abs(dt)^beta
-  return(pw)
-}
+library(WGCNA)
 
-possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
-possibleBeta <- seq(1, 20, by = 1) # the behaviour is symmetric
+# ------------- patients with Cancer ------------------
+# Choose a set of soft-thresholding powers 
+powers = c(c(1:10), seq(from = 12, to=20, by=2)) 
 
-dtf <- data.frame(
-  possibletsh = possibletsh,
-  possibleBeta = possibleBeta
-)
-
-densities <- unlist(apply(dtf, 1, function(x){
-  return(softTshPower(x["possibletsh"], x["possibleBeta"]))
-}))
-
-plot(densities)
-
-# create the correlation datasets for plotting the network for each graph
-co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
-co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
-
-# soft threshold with the power law
-co_net_corrPower_dataC <- softTshPower(co_net_corr_dataC, beta = 0.8)
-co_net_corrPower_dataN <- softTshPower(co_net_corr_dataN, beta = 0.8)
-
-# create the graph
-par(mfrow=c(1,1))
-gC <- graph_from_adjacency_matrix(co_net_corrPower_dataC, diag = FALSE)
-plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
-     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+# Call the WGCNA function 
+sft = pickSoftThreshold(t(rna_expr_data_C), powerVector = powers, verbose = 5,blockSize=8504) 
 
 
-gN <- graph_from_adjacency_matrix( co_net_corrPower_dataN, diag = FALSE)
-plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
-     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+par(mfrow = c(1,2))
 
-# degree distribution of the graphs
-par(mfrow=c(1,2))
-dgC <- degree(gC)
-dgN <- degree(gN)
-hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
-hist(dgC[dgC != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
+# Analysis of the scale-free fit index for various soft-thresholding powers (??)
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n", main = "Scale independence \n (patients with Cancer)");
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], labels=powers,cex=0.9,col="red")
+abline(h=0.85,col="red") # this line corresponds to using an R^2 cut-off of 0.85
 
-# extract the 5% of HUBS, in their conditions
-hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
-hubs_C <- hubs_C[1:floor(0.05 * length(hubs_C))] 
-hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
-hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
 
-# find the common hubs
-namesHUBS_C <- names(hubs_C)
-namesHUBS_N <- names(hubs_N)
+#Analysis of the mean connectivity for various soft-thresholding powers  
+plot(sft$fitIndices[-(1:2),1], sft$fitIndices[-(1:2),5], xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n", main = "Mean connectivity \n (patients with Cancer)") 
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=0.9, col="red")
 
-namesHUBS_C
-namesHUBS_N
-intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
+
+#it seems that 14 could be a power soft threshold to ensure a scale-free network, so:
+soft_th = 14
+
+#calculate the corresponding adjacency matrix:
+adjacency=abs(cor(t(rna_expr_data_C),use="p"))^soft_th
+
+# network connectivities:
+k=as.vector(apply(adjacency,2,sum))
+
+# The following histogram shows the frequency distribution of the connectivity;
+# we can see a large number of low connected genes, and a small number 
+# of highly connected genes:
+hist(k, main="Histogram of Connectivity \n distribution when ??=14 \n (patients with Cancer)")
+
+# The following log-log plot shows an R2 (the scale-free topology index)
+# of 0.95, which means that this is a scale-free network.
+scaleFreePlot(k, main="Check scale free topology \n (for patients with Cancer)\n")
+
+# ------------- patients withOUT Cancer ------------------
+# Choose a set of soft-thresholding powers 
+powers = c(c(1:10), seq(from = 12, to=20, by=2)) 
+
+# Call the WGCNA function 
+sft = pickSoftThreshold(t(rna_expr_data_N), powerVector = powers, verbose = 5,blockSize=8504) 
+
+
+
+# Analysis of the scale-free fit index for various soft-thresholding powers (??)
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n", main = "Scale independence \n (patients withOUT Cancer)");
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2], labels=powers,cex=0.9,col="red")
+abline(h=0.85,col="red") # this line corresponds to using an R^2 cut-off of 0.85
+
+
+#Analysis of the mean connectivity for various soft-thresholding powers  
+plot(sft$fitIndices[-(1:2),1], sft$fitIndices[-(1:2),5], xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n", main = "Mean connectivity \n (patients withOUT Cancer)") 
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=0.9, col="red")
+
+
+
+#it seems that 12 could be a power soft threshold to ensure a scale-free network, so:
+soft_th = 12
+
+#calculate the corresponding adjacency matrix:
+adjacency=abs(cor(t(rna_expr_data_N),use="p"))^soft_th
+
+# network connectivities:
+k=as.vector(apply(adjacency,2,sum))
+
+# The following histogram shows the frequency distribution of the connectivity;
+# we can see a large number of low connected genes, and a small number 
+# of highly connected genes:
+hist(k, main="Histogram of Connectivity \n distribution when ??=12 \n (patients withOUT Cancer)")
+
+# The following log-log plot shows an R2 (the scale-free topology index)
+# of 0.94, which means that this is a scale-free network.
+scaleFreePlot(k, main="Check scale free topology \n (for patients withOUT Cancer)\n")
 
 
 # 2.
