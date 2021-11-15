@@ -341,9 +341,116 @@ for(hub_comm in hubs_commonZCN){
 
 # 1.
 
+softTshPower <- function(dt, beta){
+  pw <- abs(dt)^beta
+  return(pw)
+}
+
+possibletsh <- seq(0, 1, length.out = 20) # the behaviour is symmetric
+possibleBeta <- seq(1, 20, by = 1) # the behaviour is symmetric
+
+dtf <- data.frame(
+  possibletsh = possibletsh,
+  possibleBeta = possibleBeta
+)
+
+densities <- unlist(apply(dtf, 1, function(x){
+  return(softTshPower(x["possibletsh"], x["possibleBeta"]))
+}))
+
+plot(densities)
+
+# create the correlation datasets for plotting the network for each graph
+co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
+co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
+
+# soft threshold with the power law
+co_net_corrPower_dataC <- softTshPower(co_net_corr_dataC, beta = 0.8)
+co_net_corrPower_dataN <- softTshPower(co_net_corr_dataN, beta = 0.8)
+
+# create the graph
+par(mfrow=c(1,1))
+gC <- graph_from_adjacency_matrix(co_net_corrPower_dataC, diag = FALSE)
+plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = "Co-expression network in TUMOR",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+
+
+gN <- graph_from_adjacency_matrix( co_net_corrPower_dataN, diag = FALSE)
+plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
+     arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+
+# degree distribution of the graphs
+par(mfrow=c(1,2))
+dgC <- degree(gC)
+dgN <- degree(gN)
+hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution")
+hist(dgC[dgC != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution")
+
+# extract the 5% of HUBS, in their conditions
+hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
+hubs_C <- hubs_C[1:floor(0.05 * length(hubs_C))] 
+hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
+hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
+
+# find the common hubs
+namesHUBS_C <- names(hubs_C)
+namesHUBS_N <- names(hubs_N)
+
+namesHUBS_C
+namesHUBS_N
+intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
+
+
 # 2.
 
-# 3. Extra part in which we use two different correlation method
+# Check the overlapping between the 5% of the nodes with highest
+# CI values and the "Degree"-based hubs
+
+comparisonCIwithDegreeHUBS <- function(graph, TypegHUBS) {
+  
+  # calculates the centralities
+  CI_index_between <- sort(betweenness(graph), decreasing = T) # Betweenness centrality
+  CI_index_closeness <- sort(closeness(graph), decreasing = T) # Closeness centrality
+  CI_index_eigen <- sort(eigen_centrality(graph)$vector, decreasing = T) # Eigen centrality
+  
+  # extract the hubs
+  hubs_CI_between <- CI_index_between[1:floor(0.05 * length(CI_index_between))] # Find the Hubs (top 5%)
+  namesHUBS_CI_between <- names(hubs_CI_between) # and their names
+  
+  hubs_CI_closeness <- CI_index_closeness[1:floor(0.05 * length(CI_index_closeness))] # Find the Hubs (top 5%)
+  namesHUBS_CI_closeness <- names(hubs_CI_between) # and their names
+  
+  hubs_CI_eigen <- CI_index_eigen[1:floor(0.05 * length(CI_index_eigen))] # Find the Hubs (top 5%)
+  namesHUBS_CI_eigen <- names(hubs_CI_eigen) # and their names
+  
+  # put all in a list
+  localCentralities <- list(
+    betweeness = intersect(TypegHUBS, namesHUBS_CI_between),
+    closeness = intersect(TypegHUBS, namesHUBS_CI_closeness),
+    eigen = intersect(TypegHUBS, namesHUBS_CI_eigen)
+  )
+  
+  return(localCentralities) #Let's see which centralityIndex-based hubs are also "Degree"-based hubs
+}
+
+plotCommonHUBS <- function(matrix_type, graph_type, LocalCentralities_type){ # to be complete!!
+  
+  for(hubs_type in names(LocalCentralities_type)){
+    hub_common <- LocalCentralities_type[[hubs_type]]
+    
+    V(graph_type)$color <- ifelse(V(graph_type)$name == hub_common, "red", "green")
+    plot(graph_type, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = V(graph_type)$color, main = paste("Coloring the HUBS in common", sep = " "),
+         arrow.width=.1, edge.arrow.size=.1, layout= layout_on_sphere, vertex.label = NA)
+  }
+  
+}
+
+LocalCentralities_C <- comparisonCIwithDegreeHUBS(gC, namesHUBS_C); LocalCentralities_C # Centralities
+# plotCommonHUBS(co_net_corrBinary_dataC, gC, LocalCentralities_C) # Plot the common hubs!
+LocalCentralities_N <- comparisonCIwithDegreeHUBS(gN, namesHUBS_N); LocalCentralities_N # Centralities
+
+####### 3. Extra part in which we use two different correlation method
+
 method_correlation <- c("pearson", "spearman")
 for (i in  method_correlation) {
   # create the correlation datasets for plotting the network for each graph
@@ -387,3 +494,4 @@ for (i in  method_correlation) {
 
 # TO DO: further works (eventually)
 # 1. adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
+# 2. generalize the second pick threshold in Z-fisher transform
