@@ -438,16 +438,18 @@ plotCommonHUBS <- function(matrix_type, graph_type, LocalCentralities_type){ # t
   for(hubs_type in names(LocalCentralities_type)){
     hub_common <- LocalCentralities_type[[hubs_type]]
     
-    V(graph_type)$color <- ifelse(V(graph_type)$name == hub_common, "red", "green")
-    plot(graph_type, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = V(graph_type)$color, main = paste("Coloring the HUBS in common", sep = " "),
+    V(graph_type)$color <- ifelse(V(graph_type)$name %in% hub_common, "red", "green")
+    
+    plot(graph_type, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = V(graph_type)$color, main = paste(hubs_type, "=", length(hub_common), "hubs in common", sep = " "),
          arrow.width=.1, edge.arrow.size=.1, layout= layout_on_sphere, vertex.label = NA)
   }
   
 }
 
 LocalCentralities_C <- comparisonCIwithDegreeHUBS(gC, namesHUBS_C); LocalCentralities_C # Centralities
-# plotCommonHUBS(co_net_corrBinary_dataC, gC, LocalCentralities_C) # Plot the common hubs!
+plotCommonHUBS(co_net_corrBinary_dataC, gC, LocalCentralities_C) # Plot the common hubs!
 LocalCentralities_N <- comparisonCIwithDegreeHUBS(gN, namesHUBS_N); LocalCentralities_N # Centralities
+plotCommonHUBS(co_net_corrBinary_dataN, gN, LocalCentralities_N) # Plot the common hubs!
 
 ####### 3. Extra part in which we use two different correlation method
 
