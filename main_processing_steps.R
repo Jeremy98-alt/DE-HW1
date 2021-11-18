@@ -224,8 +224,8 @@ densities <- unlist(lapply(possibletsh, function(x){
   return(OptimalThresholding(rna_expr_data_C, rna_expr_data_N, x))
 }))
 
-plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Measure of Correlation", ylab = "Fraction of nodes", main = "Naive-Hard Threshold")
-rect(xleft = 0.4, ybottom = 0.0, xright = 0.65, ytop = 1.0, density = 5, border = "red", lty = 2, lwd = 1)
+plot(possibletsh, densities, col = "blue", type = "l", lwd = 3, xlab = "Threshold of Correlation", ylab = "Fraction of nodes", main = "Hard Threshold Choice")
+rect(xleft = 0.5, ybottom = 0.0, xright = 0.65, ytop = 1.0, density = 5, border = "red", lty = 2, lwd = 1)
 
 # we consider a naive threshold to consider a well connected network like a scale-free with few hubs, its however a hard thresholding in this case
 abline(h = 0.97, lty=2)
@@ -235,6 +235,7 @@ points(x = 0.55, y = 0.97, pch = 20, col = "red", cex = 1.5) # this is our prefe
 # Ended the Extra Part ----------------------------------------------------
 
 # binary masks
+library(igraph)
 tsh <- 0.55 # 0.7
 co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
 co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
@@ -258,26 +259,92 @@ gN <- graph_from_adjacency_matrix( co_net_corrBinary_dataN, diag = FALSE)
 plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network in NORMAL",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
 
-# degree distribution of the graphs
+# degree distribution of the graphs, extract the 5% of HUBS, in their conditions
 par(mfrow=c(1,2))
 dgC <- degree(gC)
 dgN <- degree(gN)
-hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution", breaks = 50)
-hist(dgN[dgN != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution", breaks = 50)
-
-# extract the 5% of HUBS, in their conditions
 hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
 hubs_C <- hubs_C[1:floor(0.05 * length(hubs_C))] 
 hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
 hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
 
-# find the common hubs
+# plot the distribution highliting the 5% of hubs
+hist(dgC[dgC != 0], main = "Degree distribution in TUMOR condition", col = "red", xlab = "Degree Distribution", breaks = 50)
+hist(hubs_C, add = T, col = "orchid")
+abline(v = tail(hubs_C, n=1), lty = 2)
+hist(dgN[dgN != 0], main = "Degree distribution in NORMAL condition", col = "green", xlab = "Degree Distribution", breaks = 50)
+hist(hubs_N, add = T, col = "orchid")
+abline(v = tail(hubs_N, n=1), lty = 2)
+
+# find the hubs and do something interesting
 namesHUBS_C <- names(hubs_C)
 namesHUBS_N <- names(hubs_N)
 
-namesHUBS_C
-namesHUBS_N
+namesHUBS_C_df <- data.frame(gene = namesHUBS_C, degree = hubs_C, row.names = 1:length(namesHUBS_C)); namesHUBS_C_df
+namesHUBS_N_df <- data.frame(gene = namesHUBS_N, degree = hubs_N, row.names = 1:length(namesHUBS_N)); namesHUBS_N_df
+
+library(ggplot2)
+library(cowplot)
+
+histcol <- c("degree_N" = "green2", "degree" = "red")
+hub_gene_C_plot <- ggplot(data = namesHUBS_C_df, aes(x = reorder(gene, degree), y = degree)) +
+                      geom_col(aes(x = reorder(gene, degree), y = degree, fill = "degree")) +
+                      theme_light() + 
+                      theme(text = element_text(size=10),
+                            axis.text.x = element_text(angle = 45,hjust = 1),
+                            axis.title.x = element_text(face="bold"),
+                            axis.title.y = element_text(face="bold"),
+                            plot.margin=unit(c(t = 1.5, r = 1, b = 1.5, l = 1.2), "cm"),
+                            plot.title = element_text(face = "bold")) +
+                      labs( y = "Degree Index", x = "Gene") +
+                      scale_fill_manual(values= histcol) +
+                      ggtitle("Hub Gene Identification in Tumor Condition") +
+                      guides(fill=FALSE)
+
+hub_gene_N_plot <- ggplot(data = namesHUBS_N_df, aes(x = reorder(gene, degree), y = degree)) +
+                      geom_col(aes(x = reorder(gene, degree), y = degree, fill = "degree_N")) +
+                      theme_light() + 
+                      theme(text = element_text(size=10),
+                            axis.text.x = element_text(angle = 45,hjust = 1),
+                            axis.title.x = element_text(face="bold"),
+                            axis.title.y = element_text(face="bold"),
+                            plot.margin=unit(c(t = 1.5, r = 1, b = 1.5, l = 1.2), "cm"),
+                            plot.title = element_text(face = "bold")) +
+                      labs( y = "Degree Index", x = "Gene") +
+                      scale_fill_manual(values = histcol) +
+                      ggtitle("Hub Gene Identification in Normal Condition") +
+                      guides(fill=FALSE)
+
+plot_grid(hub_gene_C_plot, hub_gene_N_plot, labels = NULL)
+
 intersect(namesHUBS_C, namesHUBS_N) # Common HUBS!
+
+## ENSG00000182580 <=> EPHB3
+## A receptor gene involved on bring much signals and get two-way communication answers with other gene...
+## Check the closeness to confirm!
+sort(closeness(gC), decreasing = T)[1] # EUREKA! :D
+
+## It's more considered as an increasing receptor respect the other cells...
+## In fact...
+ifelse(res["ENSG00000182580", "log2FoldChange"] >= 1.2, "UP-REGULATED", "DOWN-REGULATED") # DOUBLE EUREKA! :D
+
+### Other Extra-Stats -----------------------------------------------------
+
+# # Up-regulated 
+upgenes <- final_dt[final_dt$log2FoldChange >= 1.2, ]
+hub_upgenes <- na.omit(upgenes[namesHUBS_C, ]) hub_upgenes
+
+# # Down-regulated 
+downgenes <- final_dt[final_dt$log2FoldChange <= 1.2, ]
+hub_downgenes <- na.omit(downgenes[namesHUBS_C, ])
+
+# # Up-regulated 
+upgenes_N <- final_dt[final_dt$log2FoldChange >= 1.2, ]
+hub_upgenes_N <- na.omit(upgenes_N[namesHUBS_N, ])
+
+# # Down-regulated 
+downgenes_N <- final_dt[final_dt$log2FoldChange <= 1.2, ]
+hub_downgenes_N <- na.omit(downgenes_N[namesHUBS_N, ])
 
 # 4. Differential Co-expressed Network ------------------------------------
 
@@ -316,7 +383,7 @@ namesHUBS_Z <- names(hubs_Z)
 namesHUBS_C <- names(hubs_C)
 namesHUBS_N <- names(hubs_N)
 
-hubs_commonZCN <- intersect(intersect(namesHUBS_C, namesHUBS_N), namesHUBS_Z) # Common HUBS!
+hubs_commonZC <- intersect(namesHUBS_C, namesHUBS_Z) # Common HUBS!
 print(hubs_commonZCN)
 
 # generalize, not always used
