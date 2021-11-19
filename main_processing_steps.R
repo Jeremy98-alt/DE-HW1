@@ -203,8 +203,8 @@ fractionNodes <- function(graph){
 
 OptimalThresholding <- function(dt, dt2, x){
   # create the correlation datasets for plotting the network for each graph
-  co_net_corr_dataC <- cor(t(dt), method = "pearson")
-  co_net_corr_dataN <- cor(t(dt2), method = "pearson")
+  co_net_corr_dataC <- cor(t(dt), method = "spearman")
+  co_net_corr_dataN <- cor(t(dt2), method = "spearman")
   
   tsh <- x
   co_net_corr_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
@@ -328,11 +328,11 @@ sort(closeness(gC), decreasing = T)[1] # EUREKA! :D
 ## In fact...
 ifelse(res["ENSG00000182580", "log2FoldChange"] >= 1.2, "UP-REGULATED", "DOWN-REGULATED") # DOUBLE EUREKA! :D
 
-### Other Extra-Stats -----------------------------------------------------
+### Other Extra-Stats for HUB Genes -----------------------------------------------------
 
 # # Up-regulated 
 upgenes <- final_dt[final_dt$log2FoldChange >= 1.2, ]
-hub_upgenes <- na.omit(upgenes[namesHUBS_C, ]) hub_upgenes
+hub_upgenes <- na.omit(upgenes[namesHUBS_C, ])
 
 # # Down-regulated 
 downgenes <- final_dt[final_dt$log2FoldChange <= 1.2, ]
@@ -350,6 +350,46 @@ hub_downgenes_N <- na.omit(downgenes_N[namesHUBS_N, ])
 
 par(mfrow=c(1,1)) #eventually reset the plot visualization
 
+## Find the Optimal Z-treshold --------------------
+
+OptimalThresholdingZ <- function(dt, dt2, x){
+  # create the correlation datasets for plotting the network for each graph
+  co_net_corr_dataC <- cor(t(dt), method = "pearson")
+  co_net_corr_dataN <- cor(t(dt2), method = "pearson")
+  
+  # Application Z-Fisher Transform
+  ZcoDataC <- log((1+co_net_corr_dataC)/(1-co_net_corr_dataC))/2
+  ZcoDataN <- log((1+co_net_corr_dataN)/(1-co_net_corr_dataN))/2
+  
+  # Applying z-scores
+  ZcoData <- (ZcoDataC-ZcoDataN)/sqrt((1/(nrow(rna_expr_data_C)-3)) + (1/(nrow(rna_expr_data_N)-3)))
+  
+  # Applying Z-tsh
+  tshZ <- x
+  ZcoData <- ifelse(ZcoData <= -abs(tshZ) | ZcoData >= abs(tshZ), 1, 0)
+  
+  gZ <- graph_from_adjacency_matrix(ZcoData, diag = FALSE)
+  
+  fracNodes_C <- fractionNodes(gZ)
+  
+  return(fracNodes_C)
+}
+
+possibletshZ <- seq(1, 15, by = 1) # the behaviour is symmetric
+densitiesZ <- unlist(lapply(possibletshZ, function(x){
+  return(OptimalThresholdingZ(rna_expr_data_C, rna_expr_data_N, x))
+}))
+
+plot(possibletshZ, densitiesZ, col = "blue", type = "l", lwd = 3, xlab = "Z-Threshold", ylab = "Fraction of nodes", main = "Z-Threshold Choice")
+rect(xleft = 8.5, ybottom = 0.0, xright = 12, ytop = 1.0, density = 5, border = "red", lty = 2, lwd = 1)
+
+# we consider a naive threshold to consider a well connected network like a scale-free with few hubs, its however a hard Zthresholding in this case
+abline(h = 0.9965, lty=2)
+abline(v = 11, lty=2)
+points(x = 11, y = 0.9965, pch = 20, col = "red", cex = 1.5) # this is our preferable naive-hard Z-thresholding
+
+## ------------------------------------------------
+
 # create the correlation datasets for plotting the network for each graph
 co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
 co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
@@ -361,8 +401,8 @@ ZcoDataN <- log((1+co_net_corr_dataN)/(1-co_net_corr_dataN))/2
 # Applying z-scores
 ZcoData <- (ZcoDataC-ZcoDataN)/sqrt((1/(nrow(rna_expr_data_C)-3)) + (1/(nrow(rna_expr_data_N)-3)))
 
-# Threshold it
-tshZ <- 11 # 11 is better for us for getting a scale-free, 3 is too bad
+# Z-Threshold it
+tshZ <- 11 # 11 is a general good Z-threshold 
 ZcoData <- ifelse(ZcoData <= -abs(tshZ) | ZcoData >= abs(tshZ), 1, 0)
 
 # Get the graph and plot it
@@ -372,7 +412,7 @@ plot(gZcoData, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "gr
 
 # dgZcoData degree distribution
 dgZcoData <- degree(gZcoData)
-hist(dgZcoData[dgZcoData != 0], main = "Degree distribution in TUMOR vs NORMAL condition", col = "red", xlab = "Degree Distribution", breaks = 50)
+hist(dgZcoData[dgZcoData != 0], main = "Degree distribution in the Differential Co-expression", col = "red", xlab = "Degree Distribution", breaks = 50)
 
 # extract the 5% of HUBS, in their conditions
 hubs_Z <- sort(degree(gZcoData, v = V(gZcoData), mode = "all"), decreasing = TRUE) # normalized TRUE
@@ -384,10 +424,10 @@ namesHUBS_C <- names(hubs_C)
 namesHUBS_N <- names(hubs_N)
 
 hubs_commonZC <- intersect(namesHUBS_C, namesHUBS_Z) # Common HUBS!
-print(hubs_commonZCN)
+print(hubs_commonZC)
 
-# generalize, not always used
-for(hub_comm in hubs_commonZCN){
+# generalize, not always used... is to highlight the subnetwork of each hub! You can try changing the hubs_commonZC to see the results
+for(hub_comm in hubs_commonZC){
   # save the genes connected for each hub in common
   subnodesHub <- names(na.omit(ZcoData[hub_comm, ZcoData[hub_comm, ] == 1]))
   
@@ -538,6 +578,14 @@ plotCommonHUBS(co_net_corrBinary_dataN, gN, LocalCentralities_N) # Plot the comm
 
 ####### 3. Extra part in which we use two different correlation method
 
+## Print the values to check which value of correlation is better
+par(mfrow=c(1,2))
+hist(rna_expr_data_C[upper.tri(rna_expr_data_C)], main = "Distribution of the Tumor data", col = "red", xlab = "Value", breaks = 50)
+rug(rna_expr_data_C[upper.tri(rna_expr_data_C)])
+hist(rna_expr_data_N[upper.tri(rna_expr_data_N)], main = "Distribution of the Normal data", col = "green", xlab = "Value", breaks = 50)
+rug(rna_expr_data_N[upper.tri(rna_expr_data_N)])
+
+par(mfrow=c(2,2))
 method_correlation <- c("pearson", "spearman")
 for (i in  method_correlation) {
   # create the correlation datasets for plotting the network for each graph
@@ -545,25 +593,25 @@ for (i in  method_correlation) {
   co_net_corr_dataN <- cor(t(rna_expr_data_N), method = i)
   
   # binary masks
-  tsh <- 0.6
+  tsh <- 0.55
   co_net_corrBinary_dataC <- ifelse(co_net_corr_dataC <= -abs(tsh) | co_net_corr_dataC >= abs(tsh), 1, 0)
   co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_dataN >= abs(tsh), 1, 0)
   
   # create the graph
   gC <- graph_from_adjacency_matrix(co_net_corrBinary_dataC, diag = FALSE)
-  plot(gC, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "red", main = paste("Co-expression network in TUMOR with", i,  "Correlation", sep = " "),
-       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+  plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "RED", main = "Co-expression network TUMOR",
+       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA)
   
   
   gN <- graph_from_adjacency_matrix( co_net_corrBinary_dataN, diag = FALSE)
-  plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = paste("Co-expression network in NORMAL with", i,  "Correlation", sep = " "),
-       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) # , vertex.label.dist = .8 and .y, vertex.label.cex=1
+  plot(gN, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Co-expression network NORMAL",
+       arrow.width=.1, edge.arrow.size=.1, layout= layout.kamada.kawai, vertex.label = NA) 
   
   # degree distribution of the graphs
   dgC <- degree(gC)
   dgN <- degree(gN)
-  hist(dgC[dgC != 0], main = paste("Degree distribution in TUMOR condition with", i, "Correlation", sep = " ") , col = "red", xlab = "Degree Distribution")
-  hist(dgC[dgC != 0], main = paste("Degree distribution in NORMAL condition  with", i, "Correlation", sep = " "), col = "green", xlab = "Degree Distribution")
+  hist(dgC[dgC != 0], main = paste(i, "Corr. TUMOR", sep = " ") , col = "red", xlab = "Degree Distribution")
+  hist(dgN[dgN != 0], main = paste(i, "Corr. NORMAL", sep = " "), col = "green", xlab = "Degree Distribution")
   
   # extract the 5% of HUBS, in their conditions
   hubs_C <- sort(degree(gC, v = V(gC), mode = "all"), decreasing = TRUE) # normalized TRUE
@@ -575,10 +623,10 @@ for (i in  method_correlation) {
   namesHUBS_C <- names(hubs_C)
   namesHUBS_N <- names(hubs_N)
   
-  print(paste(i, intersect(namesHUBS_C, namesHUBS_N), sep = " ")) # Common HUBS!
+  print(i)
+  print(intersect(namesHUBS_C, namesHUBS_N)) # Common HUBS!
 }
 
 
 # TO DO: further works (eventually)
 # 1. adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
-# 2. generalize the second pick threshold in Z-fisher transform
