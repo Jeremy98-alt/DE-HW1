@@ -513,7 +513,7 @@ soft_th = 12
 #calculate the corresponding adjacency matrix:
 adjacency=abs(cor(t(rna_expr_data_N),use="p"))^soft_th
 
-# network connectivities:
+# network connectivity:
 k=as.vector(apply(adjacency,2,sum))
 
 # The following histogram shows the frequency distribution of the connectivity;
@@ -619,14 +619,14 @@ for (i in  method_correlation) {
   hubs_N <- sort(degree(gN, v = V(gN), mode = "all"), decreasing = TRUE) # normalized TRUE
   hubs_N <- hubs_N[1:floor(0.05 * length(hubs_N))] 
   
-  # find the common hubs
-  namesHUBS_C <- names(hubs_C)
-  namesHUBS_N <- names(hubs_N)
-  
-  print(i)
-  print(intersect(namesHUBS_C, namesHUBS_N)) # Common HUBS!
+  nam <- paste("hubs_C_", i, sep = "")
+  assign(nam, names(hubs_C))
+  mamt <- paste("hubs_N_", i, sep = "")
+  assign(mamt, names(hubs_N))
 }
 
+intersect(hubs_N_pearson, hubs_N_spearman) # 10 hub genes in common
+intersect(hubs_C_pearson, hubs_C_spearman) # 19 hub genes in common
 
 # TO DO: further works (eventually)
 # 1. adding the type of edge (red or blue) in the context of the pearson correlation > 0 or viceversa
