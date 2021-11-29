@@ -165,6 +165,22 @@ genes_passed <- rownames(final_dt)
 rna_expr_data_C <- rna_expr_data_C[genes_passed, ]
 rna_expr_data_N <- rna_expr_data_N[genes_passed, ]
 
+# create the correlation datasets for plotting the network for each graph
+co_net_corr_dataC <- cor(t(rna_expr_data_C), method = "pearson")
+co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
+
+# plot the distribution of the correlations to pick naive the good 
+distroRho_pearsC <- co_net_corr_dataC[upper.tri(co_net_corr_dataC)]
+distroRho_pearsN <- co_net_corr_dataN[upper.tri(co_net_corr_dataN)]
+
+par(mfrow = c(2, 2))
+hist(distroRho_pearsC, main = "No Log2 Tumoral Data", col = "red", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
+hist(distroRho_pearsN, main = "No Log2 Normal Data", col = "green", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
+
 # log-transform FPKM data using log2(x+1) of each count
 rna_expr_data_C <- log2(rna_expr_data_C+1)
 rna_expr_data_N <- log2(rna_expr_data_N+1)
@@ -177,9 +193,12 @@ co_net_corr_dataN <- cor(t(rna_expr_data_N), method = "pearson")
 distroRho_pearsC <- co_net_corr_dataC[upper.tri(co_net_corr_dataC)]
 distroRho_pearsN <- co_net_corr_dataN[upper.tri(co_net_corr_dataN)]
 
-par(mfrow = c(1, 2))
-hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
-hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
+hist(distroRho_pearsC, main = "Log2 Tumoral Data", col = "red", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
+hist(distroRho_pearsN, main = "Log2 Normal Data", col = "green", xlab = "Rho Correlation", breaks = 50)
+abline(v = 0.55, lty=2, col = "white")
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
 
 # these are probably the candidates of having a good threshold
 quantile(abs(distroRho_pearsC))
@@ -243,10 +262,10 @@ co_net_corrBinary_dataN <- ifelse(co_net_corr_dataN <= -abs(tsh) | co_net_corr_d
 par(mfrow = c(1, 2))
 hist(distroRho_pearsC, main = "Distribution of Correlations in TUMOR genes", col = "red", xlab = "Rho Correlation", breaks = 50)
 abline(v = 0.55, lty=2, col = "white")
-points(x = 0.55, y = 0.0, pch = 20, col = "yellow", cex = 1.5) # this is our preferable naive-hard thresholding
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
 hist(distroRho_pearsN, main = "Distribution of Correlations in NORMAL gene", col = "green", xlab = "Rho Correlation", breaks = 50)
 abline(v = 0.55, lty=2, col = "white")
-points(x = 0.55, y = 0.0, pch = 20, col = "yellow", cex = 1.5) # this is our preferable naive-hard thresholding
+points(x = 0.55, y = 0.0, pch = 20, col = "black", cex = 2) # this is our preferable naive-hard thresholding
 
 # create the graph
 par(mfrow=c(1,1))
@@ -407,12 +426,12 @@ ZcoData <- ifelse(ZcoData <= -abs(tshZ) | ZcoData >= abs(tshZ), 1, 0)
 
 # Get the graph and plot it
 gZcoData <- graph_from_adjacency_matrix( ZcoData, diag = FALSE)
-plot(gZcoData, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "green", main = "Differential Co-expression network in TUMOR vs NORMAL",
+plot(gZcoData, vertex.size=5, edge.curverd=.1, arrow.size=.1, vertex.color = "orchid", main = "Differential Co-expression network in TUMOR vs NORMAL",
      arrow.width=.1, edge.arrow.size=.1, layout= layout.auto, vertex.label = NA)
 
 # dgZcoData degree distribution
 dgZcoData <- degree(gZcoData)
-hist(dgZcoData[dgZcoData != 0], main = "Degree distribution in the Differential Co-expression", col = "red", xlab = "Degree Distribution", breaks = 50)
+hist(dgZcoData[dgZcoData != 0], main = "Degree distribution in the Differential Co-expression", col = "orchid", xlab = "Degree Distribution", breaks = 50)
 
 # extract the 5% of HUBS, in their conditions
 hubs_Z <- sort(degree(gZcoData, v = V(gZcoData), mode = "all"), decreasing = TRUE) # normalized TRUE
@@ -543,7 +562,7 @@ comparisonCIwithDegreeHUBS <- function(graph, TypegHUBS) {
   namesHUBS_CI_between <- names(hubs_CI_between) # and their names
   
   hubs_CI_closeness <- CI_index_closeness[1:floor(0.05 * length(CI_index_closeness))] # Find the Hubs (top 5%)
-  namesHUBS_CI_closeness <- names(hubs_CI_between) # and their names
+  namesHUBS_CI_closeness <- names(hubs_CI_closeness) # and their names
   
   hubs_CI_eigen <- CI_index_eigen[1:floor(0.05 * length(CI_index_eigen))] # Find the Hubs (top 5%)
   namesHUBS_CI_eigen <- names(hubs_CI_eigen) # and their names
